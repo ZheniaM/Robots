@@ -1,27 +1,17 @@
 package robots.gui;
 
 import java.awt.Dimension;
-import java.awt.Point;
 import java.awt.Toolkit;
 import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.beans.PropertyVetoException;
 import java.io.IOException;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.BufferedInputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Set;
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
-import javax.swing.JInternalFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
@@ -30,7 +20,6 @@ import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
-import robots.data.CashReader;
 import robots.data.CashWriter;
 import robots.data.DataContainer;
 import robots.data.ReaderFromResouce;
@@ -42,23 +31,12 @@ import robots.log.Logger;
  *
  */
 public class MainApplicationFrame extends JFrame {
-    private final String SAVE_FILENAME = "save.out";
     private final JDesktopPane desktopPane = new JDesktopPane();
     static private final DataContainer DC = DataContainer.getInstance();
     private final String[] options =
             {DC.getContentNoException("yes"), DC.getContentNoException("no")};
 
-    public HashMap<String, Object> getProperties(JInternalFrame frame) {
-        HashMap<String, Object> result = new HashMap<String, Object>();
-        result.put("Location", frame.getLocation());
-        result.put("Size", frame.getSize());
-        result.put("Selected", frame.isSelected());
-        if (frame instanceof LogWindow)
-            result.put("Type", "Log");
-        else if (frame instanceof GameWindow)
-            result.put("Type", "Game");
-        return result;
-    }
+    private ArrayList<SaveMerge> frames = new ArrayList<SaveMerge>();
 
     public MainApplicationFrame() {
         // Make the big window be indented 50 pixels from each edge
@@ -74,61 +52,37 @@ public class MainApplicationFrame extends JFrame {
     }
 
     private void saveStates() {
-        ArrayList<HashMap<String, Object>> frames = new ArrayList<HashMap<String, Object>>();
-        for (JInternalFrame frame : desktopPane.getAllFrames()) {
-            frames.add(getProperties(frame));
+        CashWriter.deleteSaveFolder();
+        int id = 0;
+        for (SaveMerge frame : frames) {
+            frame.save(frame.getClass().getSimpleName(), id++);
         }
-        try {
-            new CashWriter(SAVE_FILENAME).writeObjects(frames);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        // FileOutputStream fos;
-        // try {
-        // fos = new FileOutputStream(SAVE_FILENAME);
-        // ObjectOutputStream oos;
-        // oos = new ObjectOutputStream(fos);
-        // oos.writeObject(frames);
-        // oos.flush();
-        // oos.close();
-        // } catch (IOException e) {
-        // e.printStackTrace();
-        // }
     }
 
     private void restoreOldProperties() {
-        try (FileInputStream is = new FileInputStream(SAVE_FILENAME);
-                ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(is));) {
-            try {
-                ArrayList<HashMap<String, Object>> restored =
-                        new CashReader(SAVE_FILENAME).readObjects();
-                // (ArrayList<HashMap<String, Object>>) ois.readObject();
-                for (HashMap<String, Object> frame : restored) {
-                    if (frame.get("Type").equals("Log")) {
-                        LogWindow logWindow = createLogWindow();
-                        logWindow.setLocation((Point) frame.get("Location"));
-                        logWindow.setSize((Dimension) frame.get("Size"));
-                        logWindow.setSelected((boolean) frame.get("Selected"));
-                        addWindow(logWindow, 150, 350);
-                    }
-                    if (frame.get("Type").equals("Game")) {
-                        GameWindow gameWindow = new GameWindow();
-                        gameWindow.setLocation((Point) frame.get("Location"));
-                        gameWindow.setSize((Dimension) frame.get("Size"));
-                        gameWindow.setSelected((boolean) frame.get("Selected"));
-                        addWindow(gameWindow, 400, 400);
-                    }
-                }
-            } catch (ClassNotFoundException e) {
-                e.printStackTrace();
-            } catch (PropertyVetoException e) {
-                e.printStackTrace();
+        restoreLogWindows();
+        restoreGameWindows();
+    }
+
+    private void restoreGameWindows() {
+        try {
+            GameWindow[] gameWindows = GameWindow.load();
+            for (GameWindow gw : gameWindows) {
+                addWindow(gw);
             }
-        } catch (FileNotFoundException e) {
-            addWindow(createLogWindow());
-            addWindow(new GameWindow(), 400, 400);
         } catch (IOException e) {
-            e.printStackTrace();
+            addWindow(createGameWindow());
+        }
+    }
+
+    private void restoreLogWindows() {
+        try {
+            LogWindow[] logWindows = LogWindow.load();
+            for (LogWindow lw : logWindows) {
+                addWindow(lw);
+            }
+        } catch (IOException e) {
+            addWindow(createLogWindow());
         }
     }
 
@@ -141,6 +95,13 @@ public class MainApplicationFrame extends JFrame {
         });
     }
 
+    protected GameWindow createGameWindow() {
+        GameWindow gw = new GameWindow();
+        gw.setSize(400, 400);
+        gw.setLocation(400, 10);
+        return gw;
+    }
+
     protected LogWindow createLogWindow() {
         LogWindow logWindow = new LogWindow(Logger.getDefaultLogSource());
         logWindow.setLocation(10, 10);
@@ -151,12 +112,13 @@ public class MainApplicationFrame extends JFrame {
         return logWindow;
     }
 
-    protected void addWindow(JInternalFrame frame) {
+    protected void addWindow(SaveMerge frame) {
+        frames.add(frame);
         desktopPane.add(frame);
         frame.setVisible(true);
     }
 
-    protected void addWindow(JInternalFrame frame, int h, int w) {
+    protected void addWindow(SaveMerge frame, int h, int w) {
         frame.setSize(w, h);
         addWindow(frame);
     }
@@ -205,7 +167,6 @@ public class MainApplicationFrame extends JFrame {
 
     private JMenu createActionsMenu() {
         JMenu actionsMenu = new JMenu(DC.getContentNoException("menu/action/title")); // "Действия"
-        // addCloseOption(actionsMenu);
         actionsMenu.add(createProperties( //
                 DC.getContentNoException("menu/action/exit/name"), // "Выйти"
                 KeyEvent.VK_Q, //

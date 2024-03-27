@@ -5,9 +5,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.HashMap;
 
 public class CashWriter {
 	private String originalName;
@@ -20,13 +17,7 @@ public class CashWriter {
 	}
 
 	private void setPath() throws IllegalArgumentException {
-		try {
-			String noJarPath = GetPathWthoutJar.getPath();
-			path = String.format("%s/cash/", noJarPath);
-		} catch (URISyntaxException e) {
-			System.out.println(String.format("\u001B[33m[WARNING]\u001B[0m with %s", originalName));
-			throw new IllegalArgumentException("Invalid URI");
-		}
+		path = CashReader.getPath();
 	}
 
 	private File getPath() throws IOException {
@@ -38,6 +29,21 @@ public class CashWriter {
 			}
 		}
 		return dir;
+	}
+
+	private void createAllDirs() throws IOException {
+		getPath();
+		String[] dirs = originalName.split("[/\\\\]");
+		StringBuilder createdPath = new StringBuilder(path);
+		for (int i = 0; i < dirs.length - 1; i++) {
+			createdPath.append("/").append(dirs[i]);
+			File currentDir = new File(createdPath.toString());
+			if (!currentDir.exists()) {
+				if (!currentDir.mkdir()) {
+					throw new IOException("Can't create this dir: " + createdPath);
+				}
+			}
+		}
 	}
 
 	private PrintWriter createWriter() throws IllegalArgumentException, IOException {
@@ -52,14 +58,14 @@ public class CashWriter {
 		pw.close();
 	}
 
-	public void writeObjects(ArrayList<HashMap<String, Object>> objects) throws IOException {
-		File dir = getPath();
-		String filename = String.format("%s/%s", dir, originalName);
+	public void writeObject(Object object) throws IOException {
+		createAllDirs();
+		String filename = String.format("%s/%s", path, originalName);
 		File file = new File(filename);
 		if (!file.exists()) {
 			boolean created = file.createNewFile();
 			if (!created) {
-				throw new IOException("Can't create " + file + " in " + dir);
+				throw new IOException("Can't create " + file + " in " + path);
 			}
 		}
 		FileOutputStream fos;
@@ -67,11 +73,29 @@ public class CashWriter {
 			fos = new FileOutputStream(filename);
 			ObjectOutputStream oos;
 			oos = new ObjectOutputStream(fos);
-			oos.writeObject(objects);
+			oos.writeObject(object);
 			oos.flush();
 			oos.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	static private void deleteFolder(File folder) {
+		File[] files = folder.listFiles();
+		if (files != null) { // some JVMs return null for empty dirs
+			for (File f : files) {
+				if (f.isDirectory()) {
+					deleteFolder(f);
+				} else {
+					f.delete();
+				}
+			}
+		}
+		folder.delete();
+	}
+
+	static public void deleteSaveFolder() {
+		deleteFolder(new File(String.format("%s/saves", CashReader.getPath())));
 	}
 }
