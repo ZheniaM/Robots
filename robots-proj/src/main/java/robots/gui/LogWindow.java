@@ -3,15 +3,11 @@ package robots.gui;
 import java.awt.BorderLayout;
 import java.awt.EventQueue;
 import java.awt.TextArea;
-import java.io.IOException;
-import java.util.Set;
 import javax.swing.JPanel;
-import robots.data.CashReader;
 import robots.data.DataContainer;
 import robots.log.LogChangeListener;
 import robots.log.LogEntry;
 import robots.log.LogWindowSource;
-import robots.log.Logger;
 
 public class LogWindow extends SaveMerge implements LogChangeListener {
     private LogWindowSource m_logSource;
@@ -31,7 +27,7 @@ public class LogWindow extends SaveMerge implements LogChangeListener {
         panel.add(m_logContent, BorderLayout.CENTER);
         getContentPane().add(panel);
         pack();
-        updateLogContent();
+        updateLogContent();	
     }
 
     private void updateLogContent() {
@@ -46,18 +42,5 @@ public class LogWindow extends SaveMerge implements LogChangeListener {
     @Override
     public void onLogChanged() {
         EventQueue.invokeLater(this::updateLogContent);
-    }
-
-    static public LogWindow[] load() throws IOException {
-        String path = String.format("saves/%s/", LogWindow.class.getSimpleName());
-        Set<String> files = CashReader.getAllFiles(path);
-        LogWindow[] res = new LogWindow[files.size()];
-        int i = 0;
-        for (String filename : files) {
-            LogWindow lw = new LogWindow(Logger.getDefaultLogSource());
-            loadTo(lw, filename);
-            res[i++] = lw;
-        }
-        return res;
     }
 }

@@ -7,11 +7,13 @@ import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Set;
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
+import javax.swing.JInternalFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
@@ -36,7 +38,7 @@ public class MainApplicationFrame extends JFrame {
     private final String[] options =
             {DC.getContentNoException("yes"), DC.getContentNoException("no")};
 
-    private ArrayList<SaveMerge> frames = new ArrayList<SaveMerge>();
+    static public ArrayList<SaveMerge> frames = new ArrayList<SaveMerge>();
 
     public MainApplicationFrame() {
         // Make the big window be indented 50 pixels from each edge
@@ -48,41 +50,31 @@ public class MainApplicationFrame extends JFrame {
         setJMenuBar(generateMenuBar());
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         setExitAction();
+        addWindow(createGameWindow());
+        addWindow(createLogWindow());
         restoreOldProperties();
     }
 
     private void saveStates() {
         CashWriter.deleteSaveFolder();
-        int id = 0;
-        for (SaveMerge frame : frames) {
-            frame.save(frame.getClass().getSimpleName(), id++);
+        for (JInternalFrame frame : desktopPane.getAllFrames()) {
+            if (frame instanceof SaveMerge) {
+                ((SaveMerge) frame).save();
+            }
         }
     }
 
     private void restoreOldProperties() {
-        restoreLogWindows();
-        restoreGameWindows();
-    }
-
-    private void restoreGameWindows() {
-        try {
-            GameWindow[] gameWindows = GameWindow.load();
-            for (GameWindow gw : gameWindows) {
-                addWindow(gw);
+        for (JInternalFrame frame : desktopPane.getAllFrames()) {
+            if (frame instanceof SaveMerge) {
+                try {
+                    ((SaveMerge) frame).load();
+                } catch (FileNotFoundException e) {
+                    System.out.println(String.format("\u001B[33mNo saves found for %s\u001b[0m", frame.getTitle()));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
-        } catch (IOException e) {
-            addWindow(createGameWindow());
-        }
-    }
-
-    private void restoreLogWindows() {
-        try {
-            LogWindow[] logWindows = LogWindow.load();
-            for (LogWindow lw : logWindows) {
-                addWindow(lw);
-            }
-        } catch (IOException e) {
-            addWindow(createLogWindow());
         }
     }
 
